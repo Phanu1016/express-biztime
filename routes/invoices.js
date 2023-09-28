@@ -35,7 +35,7 @@ router.post('/', async (req, res, next) => {
     }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.patch('/:id', async (req, res, next) => {
     try{
         const { id } = req.params
         const { amt } = req.body
@@ -43,12 +43,45 @@ router.put('/:id', async (req, res, next) => {
         if ( results.rows.length === 0){
             throw new ExpressError(`No such invoice: ${id}`, 404)
         } else {
-            return res.json(results.rows[0])
+            return res.status(201).json(results.rows[0])
         }
     } catch (error) {
         return next(error)
     }
 })
+
+router.put('/:id', async (req, res, next) => {
+    try{
+        const { id } = req.params
+        const { amt, paid } = req.body
+        let newPaidDate = null
+
+        const results = await database.query(`SELECT * FROM invoices WHERE id=$1`, [id])
+
+        if ( results.rows.length === 0){
+            throw new ExpressError(`No such invoice: ${id}`, 404)
+        } 
+        
+        const paidDate = results.rows[0].paid_date
+
+        if (!paidDate && paid) {
+            newPaidDate = new Date();
+        } else if (!paid) {
+            newPaidDate = null
+        } else {
+            newPaidDate = paidDate;
+        }
+
+        const newResults = await database.query('UPDATE invoices SET amt=$1, paid=$2, paid_date=$3 WHERE id=$4 RETURNING id, comp_code, amt, paid, add_date, paid_date', [amt, paid, newPaidDate, id])
+
+        return res.status(201).json(newResults.rows[0])
+        // 
+
+    } catch (error) {
+        return next(error)
+    }
+})
+
 
 router.delete('/:id', async (req, res, next) => {
     try{
